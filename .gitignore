@@ -1,0 +1,41 @@
+# Meta data #
+*.cfs
+
+# Eclipse
+.classpath
+.metadata
+.project
+.settings
+.cproject
+
+# Intellij
+.idea/
+*.iml
+*.iws
+
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+
+# images
+*.wu
+*.raw
+
+*.swp
+/.idea
+*.iml
+
+#temp files
+*~
+
+#cmake
+bin/
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+install_manifest.txt
+
