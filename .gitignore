@@ -1,6 +1,10 @@
 # Meta data #
 *.cfs
 
+# Jython
+*.pyc
+*.class
+
 # Eclipse
 .classpath
 .metadata

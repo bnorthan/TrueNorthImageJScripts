@@ -10,6 +10,7 @@ from jarray import zeros
 from jarray import array
 from net.imglib2.type.numeric.real import FloatType
 from net.imglib2.type.numeric.integer import UnsignedShortType
+
 from net.imglib2.type.logic import BitType
 
 from net.imagej.ops.convert import ConvertPixCopy
@@ -18,97 +19,47 @@ from net.imglib2.img.display.imagej import ImageJFunctions
 from ij.plugin.filter import BackgroundSubtracter
 from fiji.plugin.trackmate.detection import DetectionUtils
 from net.imagej.ops.threshold import Otsu
-
-def SpotDetection(dataset, data, display, ops):
-
-	dimensions2D=array( [dataset.dimension(0), dataset.dimension(1)], 'l')
-	cropIntervalRed=FinalInterval( array([0,0,0], 'l'), array([dataset.dimension(0)-1,dataset.dimension(1)-1,0],'l') )
-	cropIntervalGreen=FinalInterval( array([0,0,1], 'l'), array([dataset.dimension(0)-1,dataset.dimension(1)-1,1],'l') )
-	
-	red=ops.crop(cropIntervalRed, None, dataset.getImgPlus() ) 
-	green=ops.crop(cropIntervalGreen, None, dataset.getImgPlus() ) 
-	
-	display.createDisplay("red", data.create(red))
-	display.createDisplay("green", data.create(green))
-	
-	red32=ImgPlus( ops.create( dimensions2D, FloatType()) )
-	ops.convert(red32, red, ConvertPixCopy() )
-	
-	green32=ImgPlus( ops.create( dimensions2D, FloatType()) )
-	ops.convert(green32, green, ConvertPixCopy() )
-	
-	redgreen= ops.add(red32,green32)
-	display.createDisplay("redgreen", data.create(redgreen))
-	
-	# make a copy of the red + green image
-	copy=redgreen.copy()
-	# wrap as ImagePlus
-	imp=ImageJFunctions.wrap(copy, "wrapped")
-	
-	# create and call background subtractor
-	bgs=BackgroundSubtracter()
-	bgs.rollingBallBackground(imp.getProcessor(), 50.0, False, False, True, True, True) 
-	
-	# wrap as Img and display
-	iplus=ImagePlus("bgs", imp.getProcessor())
-	print type(imp)
-	imgBgs=ImageJFunctions.wrapFloat(iplus)
-	display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
-	
-	kernel = DetectionUtils.createLoGKernel( 2.0, 2, array([1.0, 1.0], 'd' ) )
-	
-	print type(kernel)
-	print type(imgBgs)
-	print type(red32.getImg())
-	
-	log = ops.convolve(ops.create( dimensions2D, FloatType()), imgBgs, kernel)
-	display.createDisplay("log", data.create(ImgPlus(log)))
-	
-	otsu=ops.run("threshold", ops.create( dimensions2D, BitType()), log, Otsu())
-	
-	display.createDisplay("thresholded", data.create(ImgPlus(otsu)))
-	IJ.run("Duplicate...", "title=binary.tif");
-	Prefs.blackBackground = False;
-	IJ.run("Make Binary", "");
-
+from net.imagej.ops.threshold import MaxEntropy
+from net.imagej.ops.threshold import Triangle
 
 def SpotDetectionGray(gray, data, display, ops):
-
-	dimensions2D=array( [gray.dimension(0), gray.dimension(1)], 'l')
 	
+	# get the dimensions
+	dimensions2D=array( [gray.dimension(0), gray.dimension(1)], 'l')
+
+	# convert to 32 bit
 	gray32=ImgPlus( ops.create( dimensions2D, FloatType()) )
 	ops.convert(gray32, gray, ConvertPixCopy() )
 	
-	# make a copy of the red + green image
-	copy=gray32.copy()
 	# wrap as ImagePlus
 	imp=ImageJFunctions.wrap(gray.getImgPlus(), "wrapped")
 
-	print type(imp)
 	# create and call background subtractor
 	bgs=BackgroundSubtracter()
 	bgs.rollingBallBackground(imp.getProcessor(), 50.0, False, False, True, True, True) 
 	
-	# wrap as Img and display
+	# wrap the result of background subtraction as Img and display it
 	iplus=ImagePlus("bgs", imp.getProcessor())
-	print type(imp)
 	imgBgs=ImageJFunctions.wrapByte(iplus)
-	
 	display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
 
-	
-	
-	kernel = DetectionUtils.createLoGKernel( 2.0, 2, array([1.0, 1.0], 'd' ) )
+	# create the Laplacian of Gaussian filter
+	kernel = DetectionUtils.createLoGKernel( 3.0, 2, array([1.0, 1.0], 'd' ) )
 
+	# convert the background subtracted image to 32 bit
 	img32=ImgPlus( ops.create( dimensions2D, FloatType()) )
 	ops.convert(img32, imgBgs, ConvertPixCopy() )
-	
-	log = ops.convolve(ops.create( dimensions2D, FloatType()), imgBgs, kernel)
-	display.createDisplay("log", data.create(ImgPlus(log)))
 
-	otsu=ops.run("threshold", ops.create( dimensions2D, BitType()), log, Otsu())
+	# apply the log filter and display the result
+	log=ImgPlus( ops.create( dimensions2D, FloatType()) )
+	ops.convolve(log, img32, kernel)
+	display.createDisplay("log", data.create(ImgPlus(log)))
 	
-	display.createDisplay("thresholded", data.create(ImgPlus(otsu)))
+	# apply the threshold operation
+	thresholded=ops.run("threshold", ops.create( dimensions2D, BitType()), log, Triangle())
+	display.createDisplay("thresholded", data.create(ImgPlus(thresholded)))
+
+	# convert to binary
 	IJ.run("Duplicate...", "title=binary.tif");
 	Prefs.blackBackground = False;
-	IJ.run("Make Binary", "");
+	IJ.run("Make Binary", "")
