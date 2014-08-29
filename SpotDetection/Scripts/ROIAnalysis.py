@@ -7,6 +7,8 @@ from ij import IJ
 from ij import Prefs
 from ij import WindowManager
 from ij.gui import Roi
+from ij.gui import GenericDialog
+from ij.gui import NonBlockingGenericDialog
 from ij.process import ImageProcessor
 from ij.plugin.frame import RoiManager;
 from ij.measure import Measurements
@@ -41,6 +43,8 @@ import ExportDataFunction
 reload(ExportDataFunction)
 from ExportDataFunction import exportToCsv
 
+import GuiFunction
+
 def drawRoi(processor, roi, color):
 	processor.setColor(color)
 	processor.draw(roi)
@@ -58,6 +62,13 @@ def threshold(imp, lower, upper):
 	IJ.run(duplicate, "Convert to Mask", "");
 	return duplicate
 
+imageList=GuiFunction.GetOpenImageList()
+
+nbgd=NonBlockingGenericDialog("Add ROI")
+nbgd.addMessage("Position ROI and press OK")
+nbgd.addChoice("Image1:", imageList, imageList[0]);
+nbgd.showDialog()
+'''
 inputImp=IJ.getImage()
 inputDataset=ids.getActiveDataset()
 
@@ -66,9 +77,8 @@ title=title.replace('UV', 'SD')
 
 print title
 
-trueColorImp= WindowManager.getImage(title)
-
-print type( trueColorImp)
+#trueColorImp= WindowManager.getImage(title)
+#print type( trueColorImp)
 
 # get the roi that will be processed
 inputRoi=inputImp.getRoi().clone()
@@ -119,7 +129,7 @@ APlus.setTitle('A')
 APlus.show()
 APlus.getProcessor().resetMinAndMax()
 APlus.updateAndDraw()
-AThresholded=threshold(APlus, -12, 50)
+AThresholded=threshold(APlus, -10, 50)
 
 # get the B channel
 BPlus=substackMaker.makeSubstack(labPlus, "3-3")
@@ -213,7 +223,7 @@ overlay1.add(inputRoi)
 
 def drawAllRoisOnImage(imp, mainRoi, redList, blueList):
 	imp.getProcessor().setColor(Color.green)
-	IJ.run(imp, "Line Width...", "line=7");
+	IJ.run(imp, "Line Width...", "line=3");
 	imp.getProcessor().draw(inputRoi)
 	imp.updateAndDraw()
 	IJ.run(imp, "Line Width...", "line=1");
@@ -222,14 +232,14 @@ def drawAllRoisOnImage(imp, mainRoi, redList, blueList):
 	imp.updateAndDraw()
 
 drawAllRoisOnImage(inputImp, inputRoi, redList, blueList)
-drawAllRoisOnImage(trueColorImp, inputRoi, redList, blueList)
+#drawAllRoisOnImage(trueColorImp, inputRoi, redList, blueList)
 
 # draw overlay
 #inputImp.setOverlay(overlay1)
 #inputImp.updateAndDraw()
 
-
 #exportToCsv(imagedir+'best.csv', redList)
+'''
 
 
 
