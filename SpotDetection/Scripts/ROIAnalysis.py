@@ -2,6 +2,9 @@
 # @DisplayService display
 # @net.imagej.ops.OpService ops
 # @ImageDisplayService ids
+# @String test
+# @net.imagej.Dataset
+# @net.imagej.Dataset dataset1
 
 from ij import IJ
 from ij import Prefs
@@ -68,9 +71,10 @@ nbgd=NonBlockingGenericDialog("Add ROI")
 nbgd.addMessage("Position ROI and press OK")
 nbgd.addChoice("Image1:", imageList, imageList[0]);
 nbgd.showDialog()
-'''
+
 inputImp=IJ.getImage()
-inputDataset=ids.getActiveDataset()
+#inputDataset=ids.getActiveDataset()
+inputDataset = data.create(ImgPlus(ImageJFunctions.wrapRGBA(inputImp)))
 
 title =  inputImp.getTitle()
 title=title.replace('UV', 'SD')
@@ -239,7 +243,7 @@ drawAllRoisOnImage(inputImp, inputRoi, redList, blueList)
 #inputImp.updateAndDraw()
 
 #exportToCsv(imagedir+'best.csv', redList)
-'''
+
 
 
 
