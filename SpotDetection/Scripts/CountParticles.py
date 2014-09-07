@@ -5,12 +5,14 @@ from ij.plugin.filter import ParticleAnalyzer
 
 from java.lang import Double
 
-def countParticles(imp, roim):
+def countParticles(imp, roim, minSize, maxSize, minCircularity, maxCircularity):
 	# Create a table to store the results
 	table = ResultsTable()
 	
 	# Create the particle analyzer
-	pa = ParticleAnalyzer(ParticleAnalyzer.ADD_TO_MANAGER, Measurements.AREA|Measurements.MEAN, table, 0, Double.POSITIVE_INFINITY, 0.5, 1.0)
+	pa = ParticleAnalyzer(ParticleAnalyzer.ADD_TO_MANAGER, Measurements.AREA|Measurements.MEAN, table, minSize, maxSize, minCircularity, maxCircularity)
+	#pa = ParticleAnalyzer(ParticleAnalyzer.ADD_TO_MANAGER, Measurements.AREA|Measurements.MEAN, table, 10, Double.POSITIVE_INFINITY, 0.5, 1.0)
+	#pa = ParticleAnalyzer(ParticleAnalyzer.ADD_TO_MANAGER, Measurements.AREA|Measurements.MEAN, table, 5, 6, 0.5, 1.0)
 	pa.setRoiManager(roim)
 	pa.setHideOutputImage(True)
 
@@ -21,7 +23,9 @@ def countParticles(imp, roim):
 
  	areas = table.getColumn(0)
 	intensities = table.getColumn(1)
- 	for area, intensity in zip(areas,intensities): print str(area)+": "+str(intensity)
+
+	if ( (areas!=None) and (intensities!=None)):
+ 		for area, intensity in zip(areas,intensities): print str(area)+": "+str(intensity)
 
 def filterParticles(imp, roiArray, threshold) :
  	newRoiList=[]
@@ -42,7 +46,6 @@ def filterParticlesWithFunction(imp, roiArray, function):
 			newRoiList.append(roi)
 	return newRoiList
 	
-
 def filterParticlesOutsideRange(imp, roiArray, lowerthreshold, upperthreshold) :
  	newRoiList=[]
  	for roi in roiArray:
@@ -52,13 +55,29 @@ def filterParticlesOutsideRange(imp, roiArray, lowerthreshold, upperthreshold) :
 			newRoiList.append(roi)
 	return newRoiList
 
-def accumulateInROI(roi, func, imp):
-	mask = roi.getMask()
-	ip = imp.getProcessor() 
-	r = roi.getBounds()
-	summ =  0
-	for y in range(r.height):
-		for x in range(r.width):
-			if mask.get(x,y)!=0: 
-				total+=1
-				summ+= ip.getf(r.x+x,r.y+y)
+def calculateParticleStats(A, B, redMask, roiArray):
+	areas=[]
+	ALevel=[]
+	BLevel=[]
+	redPercentage=[]
+
+	for roi in roiArray:
+		A.setRoi(roi)
+		stats = A.getStatistics()
+		areas.append(stats.area)
+		ALevel.append(stats.mean)
+		B.setRoi(roi)
+		stats=B.getStatistics()
+		BLevel.append(stats.mean)
+		redMask.setRoi(roi)
+		stats=redMask.getStatistics()
+		redPercentage.append(stats.mean)
+		
+	statsdict={}
+	statsdict['Areas']=areas
+	statsdict['ALevel']=ALevel
+	statsdict['BLevel']=BLevel
+	statsdict['redPercentage']=redPercentage
+
+	return statsdict
+
