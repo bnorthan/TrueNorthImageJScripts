@@ -43,7 +43,7 @@ def SpotDetectionGray(gray, data, display, ops, invert):
 #		iplus.getProcessor().invert()
 	
 	imgBgs=ImageJFunctions.wrapByte(iplus)
-	#display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
+	display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
 
 	# create the Laplacian of Gaussian filter
 	kernel = DetectionUtils.createLoGKernel( 3.0, 2, array([1.0, 1.0], 'd' ) )

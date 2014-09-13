@@ -40,7 +40,8 @@ import ExportDataFunction
 reload(ExportDataFunction)
 from ExportDataFunction import exportToCsv
 
-import GuiFunction
+import Utility
+reload(Utility)
 
 class DetectionParameters():
     def __init__(self, minSize, maxSize, minCircularity, maxCircularity, redPercentage):
@@ -53,11 +54,6 @@ class DetectionParameters():
 def drawRoi(processor, roi, color):
 	processor.setColor(color)
 	processor.draw(roi)
-
-def clearOutsideRoi(imp, roi):
-	imp.setRoi(roi)
-	IJ.setBackgroundColor(0, 0, 0);
-	IJ.run(imp, "Clear Outside", "");
 
 def threshold(imp, lower, upper):
 	duplicate=Duplicator().run(imp)
@@ -123,7 +119,7 @@ def roiAnalysis(inputImp, inputDataset, ops, data, display, detectionParameters)
 	channels=ChannelSplitter().split(duplicate)
 	redPlus=channels[0]
 	red=ImgPlus(ImageJFunctions.wrapByte(redPlus))
-	#redPlus.show()
+	redPlus.show()
 	
 	# convert to lab
 	IJ.run(croppedPlus, "Color Transformer", "colour=Lab")
@@ -174,12 +170,12 @@ def roiAnalysis(inputImp, inputDataset, ops, data, display, detectionParameters)
 	# clear the region outside the roi
 	clone=inputRoi.clone()
 	clone.setLocation(0,0)
-	clearOutsideRoi(impthresholded, clone)
+	Utility.clearOutsideRoi(impthresholded, clone)
 	
 	# create a hidden roi manager
 	roim = RoiManager(True)
 	
-	# count the particles
+	# count the particlesimp.getProcessor().setColor(Color.green)
 	countParticles(impthresholded, roim, detectionParameters.minSize, detectionParameters.maxSize, detectionParameters.minCircularity, detectionParameters.maxCircularity)
 	
 	# define a function to determine the percentage of pixels that are foreground in a binary image

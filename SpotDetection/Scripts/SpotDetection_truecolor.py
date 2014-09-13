@@ -11,6 +11,8 @@ from jarray import array
 from net.imglib2.type.numeric.real import FloatType
 from net.imglib2.type.numeric.integer import UnsignedShortType
 from net.imglib2.type.logic import BitType
+from ij.plugin.frame import RoiManager;
+from ij.gui import Roi
 
 from net.imagej.ops.convert import ConvertPixCopy
 from net.imglib2.meta import ImgPlus
@@ -20,25 +22,33 @@ from fiji.plugin.trackmate.detection import DetectionUtils
 from net.imagej.ops.threshold import Otsu
 from net.imagej.ops.threshold import Triangle
 from net.imagej.ops.threshold import MaxEntropy
+from ij.plugin import Duplicator
 
 import sys
 
-homedir='/home/bnorthan/Brian2012/Round2/ImageJScriptingProjects/'
-#homedir='/home/bnorthan/Brian2014/Projects/ImageJScriptingProjects/'
+#homedir='/home/bnorthan/Brian2012/Round2/ImageJScriptingProjects/'
+homedir='/home/bnorthan/Brian2014/Projects/ImageJScriptingProjects/'
 jythondir=homedir+'TrueNorthImageJScripts/SpotDetection/Scripts/'
 roiname=homedir+'ProprietaryImages/Evalulab/Rois/Right.roi'
 sys.path.append(jythondir)
 
-import GuiFunction
-reload(GuiFunction)
+import Utility
+reload(Utility)
 
-inputDirectory='/home/bnorthan/Brian2012/Round2/RogueImageJPlugins/SpotDetection/Images/'
-inputName='001-D0_cropped.tif'
+import CountParticles
+reload(CountParticles)
+from CountParticles import countParticles
+
+#inputDirectory='/home/bnorthan/Brian2012/Round2/RogueImageJPlugins/SpotDetection/Images/'
+#inputName='001-D0_cropped.tif'
 
 #dataset=data.open(inputDirectory+inputName)
 #display.createDisplay(dataset.getName(), dataset)
 inputImp=IJ.getImage()
-inputDataset=GuiFunction.getDatasetByName(data, inputImp.getTitle())
+inputDataset=Utility.getDatasetByName(data, inputImp.getTitle())
+
+truecolor1=Duplicator().run(inputImp)
+truecolor1.show()
 
 # get the roi that will be processed
 inputRoi=inputImp.getRoi().clone()
@@ -62,44 +72,67 @@ blue=ops.crop(cropIntervalBlue, None, dataset.getImgPlus() )
 
 display.createDisplay("blue", data.create(blue))
 
-blue32=ImgPlus( ops.create( dimensions2D, FloatType()) )
-ops.convert(blue32, blue, ConvertPixCopy() )
+#blue32=ImgPlus( ops.create( dimensions2D, FloatType()) )
+#ops.convert(blue32, blue, ConvertPixCopy() )
 
 # make a copy of the red + green image
-copy=blue32.copy()
+
 # wrap as ImagePlus
-imp=ImageJFunctions.wrap(copy, "wrapped")
-imp.getProcessor().invert()
+imp=IJ.getImage()
+#imp=ImageJFunctions.wrap(blue, "wrapped")
 
 # create and call background subtractor
 bgs=BackgroundSubtracter()
-bgs.rollingBallBackground(imp.getProcessor(), 50.0, False, False, True, True, True) 
+bgs.rollingBallBackground(imp.getProcessor(), 20.0, False, True, True, True, True) 
+
+imp.getProcessor().invert()
+imp.show()
 
 print imp
 
 # wrap as Img and display
 iplus=ImagePlus("bgs", imp.getProcessor())
-imgBgs=ImageJFunctions.wrapFloat(iplus)
+imgBgs=ImageJFunctions.wrapByte(iplus)
 print iplus
 print imgBgs
 
 display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
 
+'''
 kernel = DetectionUtils.createLoGKernel( 2.0, 2, array([1.0, 1.0], 'd' ) )
 
 print type(kernel)
 print type(imgBgs)
-print type(blue32.getImg())
 
-log = ops.convolve(ops.create( dimensions2D, FloatType()), imgBgs, kernel)
+bgs32=ImgPlus( ops.create( dimensions2D, FloatType()) )
+ops.convert(bgs32, imgBgs, ConvertPixCopy() )
+
+log = ops.convolve(ops.create( dimensions2D, FloatType()), bgs32, kernel)
 display.createDisplay("log", data.create(ImgPlus(log)))
 
-otsu=ops.run("threshold", ops.create( dimensions2D, BitType()), log, Triangle())
-
+otsu=ops.run("threshold", ops.create( dimensions2D, BitType()), imgBgs, Otsu())
 display.createDisplay("thresholded", data.create(ImgPlus(otsu)))
+'''
 
-Prefs.blackBackground = False;
-IJ.run("Make Binary", "");
+#Utility.clearOutsideRoi(imp, clone)
+IJ.run(imp, "Auto Local Threshold", "method=MidGrey radius=15 parameter_1=0 parameter_2=0 white");
+IJ.run(imp, "Fill Holes", "");
+IJ.run(imp, "Close-", "");
+IJ.run(imp, "Watershed", "");
+
+iplus.updateAndDraw()
+
+# create a hidden roi manager
+roim = RoiManager(True)
+	
+# count the particles
+countParticles(iplus, roim, 10, 200, 0.5, 1.0)
+
+[truecolor1.getProcessor().draw(roi) for roi in roim.getRoisAsArray()]
+truecolor1.updateAndDraw()
+	
+#Prefs.blackBackground = False;
+#IJ.run("Make Binary", "");
 
 #IJ.run("LoG 3D");
 

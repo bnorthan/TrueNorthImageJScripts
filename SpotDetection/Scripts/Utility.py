@@ -1,3 +1,4 @@
+from ij import IJ
 from ij import WindowManager
 
 def GetOpenImageList():
@@ -16,4 +17,9 @@ def getDatasetByName(data, name):
 		if dataset.getName()==name:
 			return dataset
 	return None
+
+def clearOutsideRoi(imp, roi):
+	imp.setRoi(roi)
+	IJ.setBackgroundColor(0, 0, 0);
+	IJ.run(imp, "Clear Outside", "");
 		

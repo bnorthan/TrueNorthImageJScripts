@@ -25,8 +25,8 @@ reload(ROIAnalysis)
 from ROIAnalysis import roiAnalysis
 from ROIAnalysis import DetectionParameters
 
-import GuiFunction
-reload(GuiFunction)
+import Utility
+reload(Utility)
 
 def runRoiAnalysis():
 	roiManager=RoiManager(False)
@@ -35,7 +35,7 @@ def runRoiAnalysis():
 	roi=roiHash.get("Right")
 	print roi
 	
-	imageList=GuiFunction.GetOpenImageList()
+	imageList=Utility.GetOpenImageList()
 
 	nbgd=NonBlockingGenericDialog(Messages.AddRoi)
 	nbgd.addMessage(Messages.ChooseImage)
@@ -50,17 +50,17 @@ def runRoiAnalysis():
 	name = nbgd.getNextChoice()
 
 	inputImp = WindowManager.getImage(name)
-	inputDataset=GuiFunction.getDatasetByName(data, name)
+	inputDataset=Utility.getDatasetByName(data, name)
 
 	print inputImp
 	print inputDataset
 	
 	detectionParameters=DetectionParameters(10, 200, 0.5, 1.0, 0.3)
 
-	'''inputImp.setRoi(roi)
+	#inputImp.setRoi(roi)
 
 	nbgd2=NonBlockingGenericDialog(Messages.PositionRoiAndPressOK)
-	nbgd2.showDialog()'''
+	nbgd2.showDialog()
 
 	print inputDataset
 	
