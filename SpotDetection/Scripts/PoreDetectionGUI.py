@@ -21,15 +21,15 @@ import MessageStrings
 reload(MessageStrings)
 from MessageStrings import Messages
 
-import ROIAnalysis
-reload(ROIAnalysis)
-from ROIAnalysis import roiAnalysis
-from ROIAnalysis import DetectionParameters
+import PoreDetectionUV
+reload(PoreDetectionUV)
+from PoreDetectionUV import poreDetectionUV
+from PoreDetectionUV import DetectionParameters
 
 import Utility
 reload(Utility)
 
-def runRoiAnalysis():
+def runPoreDetection():
 	roiManager=RoiManager(False)
 	roiManager.runCommand("open", roiname)
 	roiHash=roiManager.getROIs()
@@ -65,10 +65,10 @@ def runRoiAnalysis():
 
 	print inputDataset
 	
-	roiAnalysis(inputImp, inputDataset, ops, data, display, detectionParameters)
+	poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParameters)
 
 if __name__ == '__main__':
-	runRoiAnalysis()
+	runPoreDetection()
 	
 	
 	

@@ -63,7 +63,7 @@ def threshold(imp, lower, upper):
 	IJ.run(duplicate, "Convert to Mask", "");
 	return duplicate
 
-def roiAnalysis(inputImp, inputDataset, ops, data, display, detectionParameters):
+def poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParameters):
 	
 	title =  inputImp.getTitle()
 	title=title.replace('UV', 'SD')
