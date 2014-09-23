@@ -18,16 +18,13 @@ from net.imglib2.meta import ImgPlus
 from net.imglib2.img.display.imagej import ImageJFunctions
 from ij.plugin.filter import BackgroundSubtracter
 from fiji.plugin.trackmate.detection import DetectionUtils
-from net.imagej.ops.threshold import Otsu
-from net.imagej.ops.threshold import MaxEntropy
-from net.imagej.ops.threshold import Triangle
-from net.imagej.ops.threshold import Manual
 
-# gray - gray level dataset
+# gray - gray level ImgPlus
 def SpotDetectionGray(gray, data, display, ops, invert):
 	
 	# get the dimensions
 	dimensions2D=array( [gray.dimension(0), gray.dimension(1)], 'l')
+	factory=gray.getImg().factory()
 
 	# wrap as ImagePlus
 	imp=ImageJFunctions.wrap(gray, "wrapped")
@@ -45,22 +42,24 @@ def SpotDetectionGray(gray, data, display, ops, invert):
 	imgBgs=ImageJFunctions.wrapByte(iplus)
 	display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
 
-	# create the Laplacian of Gaussian filter
-	kernel = DetectionUtils.createLoGKernel( 3.0, 2, array([1.0, 1.0], 'd' ) )
-
 	# convert the background subtracted image to 32 bit
-	imgBgs32=ImgPlus( ops.create( dimensions2D, FloatType()) )
+	temp=ops.run( "createimg", factory, FloatType(), dimensions2D )
+	imgBgs32=ImgPlus( temp )
 	ops.convert(imgBgs32, imgBgs, ConvertPixCopy() )
 	#display.createDisplay("back_sub 32", data.create(ImgPlus(imgBgs32))) 
 
+	# create the Laplacian of Gaussian filter
+	kernel = DetectionUtils.createLoGKernel( 3.0, 2, array([1.0, 1.0], 'd' ) )
+
 	# apply the log filter and display the result
-	log=ImgPlus( ops.create( dimensions2D, FloatType()) )
+	log=ImgPlus( ops.run("createimg", factory, FloatType(), dimensions2D) )
 	ops.convolve(log, imgBgs32, kernel)
 	#display.createDisplay("log", data.create(ImgPlus(log)))
 	
 	# apply the threshold operation
-	thresholded=ops.run("threshold", ops.create( dimensions2D, BitType()), log, Triangle())
-
+	#thresholded=ops.run("threshold", ops.create( dimensions2D, BitType()), log, Triangle())
+	thresholded = ops.run("triangle", log)
+	
 	return ImgPlus(thresholded)
 
 def SpotDetectionRedFromHue(hue, data, ops, display):
