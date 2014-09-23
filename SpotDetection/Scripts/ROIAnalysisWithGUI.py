@@ -11,7 +11,8 @@ from ij.plugin.frame import RoiManager
 
 import sys
 
-homedir='/home/bnorthan/Brian2014/Projects/ImageJScriptingProjects/'
+homedir='/home/bnorthan/Brian2012/Round2/ImageJScriptingProjects/'
+#homedir='/home/bnorthan/Brian2014/Projects/ImageJScriptingProjects/'
 jythondir=homedir+'TrueNorthImageJScripts/SpotDetection/Scripts/'
 roiname=homedir+'ProprietaryImages/Evalulab/Rois/Right.roi'
 sys.path.append(jythondir)

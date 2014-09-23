@@ -241,8 +241,8 @@ def roiAnalysis(inputImp, inputDataset, ops, data, display, detectionParameters)
 	#drawAllRoisOnImage(trueColorImp, inputRoi, redList, blueList)
 	
 	# draw overlay
-	inputImp.setOverlay(overlay1)
-	inputImp.updateAndDraw()
+	#inputImp.setOverlay(overlay1)
+	#inputImp.updateAndDraw()
 	
 	statsdict=CountParticles.calculateParticleStats(APlus, BPlus, redMask, roim.getRoisAsArray())
 	
@@ -274,18 +274,15 @@ def roiAnalysis(inputImp, inputDataset, ops, data, display, detectionParameters)
 
 	redAverage=redTotal/len(redPercentages)
 
-	print poreArea
-	print poreArea/inputRoiArea
-	print AAverage
-	print BAverage
-	print redAverage
+
+	pixwidth=inputImp.getCalibration().pixelWidth
+
+	inputRoiArea=inputRoiArea/(pixwidth*pixwidth)
 	
-
-		
+	print str(len(allList))+" "+str(len(redList))+" "+str(len(blueList))+" "+str(poreArea/inputRoiArea)+" "+str(redAverage)
+	#print poreArea/inputRoiArea
+	#print AAverage
+	#print BAverage
+	#print redAverage
+	
 	#exportToCsv(imagedir+'best.csv', redList)
-
-
-
-
-
-
