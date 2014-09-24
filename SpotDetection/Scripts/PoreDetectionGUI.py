@@ -30,11 +30,11 @@ import Utility
 reload(Utility)
 
 def runPoreDetection():
-	roiManager=RoiManager(False)
+	'''roiManager=RoiManager(False)
 	roiManager.runCommand("open", roiname)
 	roiHash=roiManager.getROIs()
 	roi=roiHash.get("Right")
-	print roi
+	print roi'''
 	
 	imageList=Utility.GetOpenImageList()
 
@@ -52,20 +52,16 @@ def runPoreDetection():
 
 	inputImp = WindowManager.getImage(name)
 	inputDataset=Utility.getDatasetByName(data, name)
-
-	print inputImp
-	print inputDataset
 	
 	detectionParameters=DetectionParameters(10, 200, 0.5, 1.0, 0.3)
 
 	#inputImp.setRoi(roi)
 
-	nbgd2=NonBlockingGenericDialog(Messages.PositionRoiAndPressOK)
+	nbgd2=NonBlockingGenericDialog(Messages.PositionRoi)
+	nbgd2.addMessage(Messages.PositionRoiAndPressOK)
 	nbgd2.showDialog()
 
-	print inputDataset
-	
-	poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParameters)
+	poreDetectionUV(inputImp, inputDataset, inputImp.getRoi().clone(), ops, data, display, detectionParameters)
 
 if __name__ == '__main__':
 	runPoreDetection()

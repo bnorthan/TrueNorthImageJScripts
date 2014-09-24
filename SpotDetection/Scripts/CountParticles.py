@@ -81,3 +81,13 @@ def calculateParticleStats(A, B, redMask, roiArray):
 
 	return statsdict
 
+def addParticleToOverlay(roi, overlay, color):
+	roi.setStrokeColor(color)
+	overlay.add(roi)
+	
+def drawParticleOnImage(imp, roi, color):
+	imp.getProcessor().setColor(color)
+	imp.getProcessor().draw(roi)
+
+
+

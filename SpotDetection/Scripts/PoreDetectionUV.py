@@ -63,7 +63,7 @@ def threshold(imp, lower, upper):
 	IJ.run(duplicate, "Convert to Mask", "");
 	return duplicate
 
-def poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParameters):
+def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detectionParameters):
 	
 	title =  inputImp.getTitle()
 	title=title.replace('UV', 'SD')
@@ -73,8 +73,7 @@ def poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParamet
 	#trueColorImp= WindowManager.getImage(title)
 	#print type( trueColorImp)
 	
-	# get the roi that will be processed
-	inputRoi=inputImp.getRoi().clone()
+	# calculate are of roi 
 	stats=inputImp.getStatistics()
 	inputRoiArea=stats.area
 	
@@ -207,25 +206,17 @@ def poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParamet
 	print "Total particles: "+str(len(allList))
 	print "Filtered particles: "+str(len(redList))
 
-	# for each rio add the offset such that the roi is positioned in the correct location for the 
+	# for each roi add the offset such that the roi is positioned in the correct location for the 
 	# original image
 	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in allList]
 	
 	# create an overlay and add the rois
 	overlay1=Overlay()
-	
-	def addParticleToOverlay(roi, overlay, color):
-		roi.setStrokeColor(color)
-		overlay.add(roi)
-	
-	def drawParticleOnImage(imp, roi, color):
-		imp.getProcessor().setColor(color)
-		imp.getProcessor().draw(roi)
-	
+		
 	inputRoi.setStrokeColor(Color.green)
 	overlay1.add(inputRoi)
-	[addParticleToOverlay(roi, overlay1, Color.red) for roi in redList]
-	[addParticleToOverlay(roi, overlay1, Color.cyan) for roi in blueList]
+	[CountParticles.addParticleToOverlay(roi, overlay1, Color.red) for roi in redList]
+	[CountParticles.addParticleToOverlay(roi, overlay1, Color.cyan) for roi in blueList]
 	
 	def drawAllRoisOnImage(imp, mainRoi, redList, blueList):
 		imp.getProcessor().setColor(Color.green)
@@ -233,8 +224,8 @@ def poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParamet
 		imp.getProcessor().draw(inputRoi)
 		imp.updateAndDraw()
 		IJ.run(imp, "Line Width...", "line=1");
-		[drawParticleOnImage(imp, roi, Color.magenta) for roi in redList]
-		[drawParticleOnImage(imp, roi, Color.green) for roi in blueList]
+		[CountParticles.drawParticleOnImage(imp, roi, Color.magenta) for roi in redList]
+		[CountParticles.drawParticleOnImage(imp, roi, Color.green) for roi in blueList]
 		imp.updateAndDraw()
 	
 	drawAllRoisOnImage(inputImp, inputRoi, redList, blueList)
@@ -273,8 +264,6 @@ def poreDetectionUV(inputImp, inputDataset, ops, data, display, detectionParamet
 		redTotal=redTotal+red
 
 	redAverage=redTotal/len(redPercentages)
-
-
 	pixwidth=inputImp.getCalibration().pixelWidth
 
 	inputRoiArea=inputRoiArea/(pixwidth*pixwidth)
