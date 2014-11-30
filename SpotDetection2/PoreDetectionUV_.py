@@ -18,7 +18,6 @@ reload(PoreDetectionUV)
 from PoreDetectionUV import runPoreDetection
 
 if __name__ == '__main__':
-	
 	inputImp = IJ.getImage()
 	runPoreDetection(inputImp, data, ops, display)
 	

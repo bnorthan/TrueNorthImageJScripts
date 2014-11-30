@@ -49,20 +49,19 @@ import DetectionParams
 reload(DetectionParams)
 from DetectionParams import DetectionParams 
 
-import Constants
-reload(Constants)
-from Constants import Constants
-
 import MessageStrings
 reload(MessageStrings)
 from MessageStrings import Messages
 
 def runPoreDetection(inputImp, data, ops, display):
-	
+
+	# in this step get the image in the "imagej2" dataset format
+	# this way we can take advantage of some of the new imagej2 functionality
 	name=inputImp.getTitle()	
 	inputDataset=Utility.getDatasetByName(data, name)
-	
-	detectionParameters=DetectionParams(Constants.pixelWidth, Constants.pixelHeight, Constants.smallestObject, Constants.largestObject, 0.5, 1.0, 0.3)
+
+	# this structure keeps track of detection parameters
+	detectionParameters=DetectionParams()
 
 	roi=inputImp.getRoi()
 
@@ -73,28 +72,10 @@ def runPoreDetection(inputImp, data, ops, display):
 
 	roi=inputImp.getRoi().clone();
 
-	roilist, statslist, statsdict, statsheader=poreDetectionUV(inputImp, inputDataset, roi, ops, data, display, detectionParameters)
+	roilist, statslist, statsheader=poreDetectionUV(inputImp, inputDataset, roi, ops, data, display, detectionParameters)
 
-	directory=inputImp.getOriginalFileInfo().directory
-	name=os.path.splitext(inputImp.getTitle())[0];
-
-	# name of file to save image with overlay	
-	overlaydir=os.path.join(directory, 'overlay')
-	print "overlaydir: "+overlaydir
-	print "directory: "+directory
+	directory, overlayname, roiname=Utility.createImageNames(inputImp)
 	
-	if not os.path.exists(overlaydir):
-		os.makedirs(overlaydir)
-	overlayname=os.path.join(overlaydir, name+'_overlay.tif')
-	
-	# name of file to save roi 
-	roidir=os.path.join(directory, 'roi')
-	if not os.path.exists(roidir):
-		os.makedirs(roidir)
-	roiname=os.path.join(roidir, name+'.roi')
-	print "roidir: "+roidir
-
-	print "directory: "+directory
 	# name of file to save summary stats 
 	statsname=os.path.join(directory, 'stats.csv')
 	
@@ -107,13 +88,11 @@ def runPoreDetection(inputImp, data, ops, display):
 	statsheader.insert(0,Messages.FileName)
 	statslist.insert(0,name)
 
-	#ExportDataFunction.exportUVStats(roistatsname, statsdict)
 	ExportDataFunction.exportSummaryStats(statsname, statsheader, statslist)
 
 	print statsname
-
+	print statsheader
 	print statslist
-
 
 def drawRoi(processor, roi, color):
 	processor.setColor(color)
@@ -128,17 +107,13 @@ def threshold(imp, lower, upper):
 	return duplicate
 
 def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detectionParameters):
-	
-	title =  inputImp.getTitle()
-	title=title.replace('UV', 'SD')
-	
-	print title
+
+	# set calibration
+	detectionParameters.setCalibration(inputImp);
 	
 	# calculate area of roi 
 	stats=inputImp.getStatistics()
 	inputRoiArea=stats.area
-	
-	print inputRoi
 	
 	# get the bounding box of the active roi
 	inputRec = inputRoi.getBounds()
@@ -160,27 +135,28 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	
 	# duplicate the roi
 	duplicate=duplicator.run(croppedPlus)
-	#duplicate.show()
 	
 	# convert duplicate of roi to HSB and get brightness
 	IJ.run(duplicate, "HSB Stack", "");
 	brightnessPlus=substackMaker.makeSubstack(duplicate, "3-3")
 	brightness=ImgPlus(ImageJFunctions.wrapByte(brightnessPlus))
 	brightnessPlus.setTitle("Brightness")
-	#brightnessPlus.show()
 	
 	# make another duplicate, split channels and get red
 	duplicate=duplicator.run(croppedPlus)
 	channels=ChannelSplitter().split(duplicate)
 	redPlus=channels[0]
 	red=ImgPlus(ImageJFunctions.wrapByte(redPlus))
-	#redPlus.show()
 	
 	# convert to lab
 	IJ.run(croppedPlus, "Color Transformer", "colour=Lab")
 	IJ.selectWindow('Lab')
 	labPlus=IJ.getImage()
-	
+
+	# get the L channel
+	#LPlus=substackMaker.makeSubstack(labPlus, "1-1")
+	#l=ImgPlus(ImageJFunctions.wrapByte(lPlus))
+		
 	# get the A channel
 	APlus=substackMaker.makeSubstack(labPlus, "2-2")
 	APlus.setTitle('A')
@@ -201,7 +177,6 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	ic = ImageCalculator();
 	redMask = ic.run("AND create", AThresholded, BThresholded);
 	IJ.run(redMask, "Divide...", "value=255");
-	#redMask.show()
 	
 	labPlus.close()
 	
@@ -212,157 +187,136 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	
 	# threshold the spots from the brightness channel
 	thresholded=SpotDetectionGray(brightness, data, display, ops, False, "triangle")
-	#display.createDisplay("thresholded", data.create(thresholded))
 	impthresholded=ImageJFunctions.wrap(thresholded, "wrapped")
-
-	duplicate=duplicator.run(brightnessPlus);
-	duplicate.show()
-	thresholdedDark=SpotDetectionFunction.SpotDetectionDark(duplicate);
-	
 	# or the thresholding results from red and brightness channel
 	impthresholded = ic.run("OR create", impthresholded, impthresholdedred);
+	
+	roim=RoiManager(True)
 	
 	# convert to mask
 	Prefs.blackBackground = True
 	IJ.run(impthresholded, "Convert to Mask", "")
 	
-	# clear the region outside the roi
-	clone=inputRoi.clone()
-	clone.setLocation(0,0)
-	Utility.clearOutsideRoi(impthresholded, clone)
-	
-	# create a hidden roi manager
-	roim = RoiManager(True)
-	detectionParameters.setCalibration(impthresholded)
-	# count the particlesimp.getProcessor().setColor(Color.green)
-	countParticles(impthresholded, roim, detectionParameters.minSize, detectionParameters.maxSize, detectionParameters.minCircularity, detectionParameters.maxCircularity)
-	
-	roim2 = RoiManager(True)
-	detectionParameters.setCalibration(thresholdedDark)
-	# count the particlesimp.getProcessor().setColor(Color.green)
-	countParticles(thresholdedDark, roim2, 10, 100000, 0.2, 1.0)
-	
-	# define a function to determine the percentage of pixels that are foreground in a binary image
-	# inputs:
-	#    imp: binary image, 0=background, 1=foreground
-	#    roi: an roi
 	def isRed(imp, roi):
 		stats = imp.getStatistics()
 	
-		if (stats.mean>detectionParameters.redPercentage): return True
+		if (stats.mean>detectionParameters.porphyrinRedPercentage): return True
 		else: return False
 	
 	def notRed(imp, roi):
 		stats = imp.getStatistics()
 	
-		if (stats.mean>detectionParameters.redPercentage): return False
+		if (stats.mean>detectionParameters.porphyrinRedPercentage): return False
 		else: return True
 
-	allList=[]
-	darkList=[]
 
+	roiClone=inputRoi.clone()
+	roiClone.setLocation(0,0)
+	Utility.clearOutsideRoi(impthresholded, roiClone)
+	
+	countParticles(impthresholded, roim, detectionParameters.porphyrinMinSize, detectionParameters.porphyrinMaxSize, \
+		detectionParameters.porphyrinMinCircularity, detectionParameters.porphyrinMaxCircularity)
+
+	thresholdedDark=SpotDetectionFunction.SpotDetectionDark(brightnessPlus);
+
+	# clear the region outside the roi
+	Utility.clearOutsideRoi(thresholdedDark, roiClone)
+ 
+	roimClosedPores = RoiManager(True)
+	detectionParameters.setCalibration(thresholdedDark)
+	countParticles(thresholdedDark, roimClosedPores, detectionParameters.closedPoresMinSize, detectionParameters.closedPoresMaxSize, \ 
+		detectionParameters.closedPoresMinCircularity, detectionParameters.closedPoresMaxCircularity)
+	
+	roimOpenPores = RoiManager(True)
+	detectionParameters.setCalibration(thresholdedDark)
+	countParticles(thresholdedDark, roimOpenPores, detectionParameters.openPoresMinSize, detectionParameters.openPoresMaxSize, \ 
+		detectionParameters.openPoresMinCircularity, detectionParameters.openPoresMaxCircularity)
+	
+	uvPoreList=[]
+	openPoresList=[]
+	closedPoresList=[]
+	
 	for roi in roim.getRoisAsArray():
-		allList.append(roi.clone())
+		uvPoreList.append(roi.clone())
+	for roi in roimClosedPores.getRoisAsArray():
+		closedPoresList.append(roi.clone())
+	for roi in roimOpenPores.getRoisAsArray():
+		openPoresList.append(roi.clone())
 
-	for roi in roim2.getRoisAsArray():
-		darkList.append(roi.clone())
+	brightnessPlus.setRoi(roiClone)
+	stats=brightnessPlus.getStatistics()
+	roiMean=stats.mean
 	
 
-	
-	# count particles that are red
-	redList=CountParticles.filterParticlesWithFunction(redMask, allList, isRed)
-	# count particles that are red
-	blueList=CountParticles.filterParticlesWithFunction(redMask, allList, notRed)
+	def isDark(imp, roi):
+		stats=imp.getStatistics()
 
-	print "Total particles: "+str(len(allList))
-	print "Filtered particles: "+str(len(redList))
+		print ""
+		print roiMean
+		print stats.mean
+		
+		if (stats.mean<roiMean): return True
+		else: return False
+
 
 	
+	openPoresList=CountParticles.filterParticlesWithFunction(brightnessPlus, openPoresList, isDark)
+	closedPoresList=CountParticles.filterParticlesWithFunction(brightnessPlus, closedPoresList, isDark)
+	print "roiMean"+str(roiMean)
+	allList=uvPoreList+closedPoresList+openPoresList
+	
+	# count particles that are porphyrins (red)
+	porphyrinList=CountParticles.filterParticlesWithFunction(redMask, uvPoreList, isRed)
+	# count particles that are visible on uv but not porphyrins
+	notPorphyrinList=CountParticles.filterParticlesWithFunction(redMask, uvPoreList, notRed)
+
 	# for each roi add the offset such that the roi is positioned in the correct location for the 
 	# original image
-	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in allList]
-	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in darkList]
-	# create an overlay and add the rois
-	overlay1=Overlay()
-	inputRoi.setStrokeColor(Color.green)
-	overlay1.add(inputRoi)
-	[CountParticles.addParticleToOverlay(roi, overlay1, Color.red) for roi in redList]
-	[CountParticles.addParticleToOverlay(roi, overlay1, Color.cyan) for roi in blueList]
-	def drawAllRoisOnImage(imp, mainRoi, redList, blueList):
-		imp.getProcessor().setColor(Color.green)
-		IJ.run(imp, "Line Width...", "line=3");
-		imp.getProcessor().draw(inputRoi)
-		imp.updateAndDraw()
-		IJ.run(imp, "Line Width...", "line=1");
-		[CountParticles.drawParticleOnImage(imp, roi, Color.magenta) for roi in redList]
-		[CountParticles.drawParticleOnImage(imp, roi, Color.green) for roi in blueList]
-		imp.updateAndDraw()
-	
-	drawAllRoisOnImage(inputImp, inputRoi, redList, blueList)
-	[CountParticles.drawParticleOnImage(inputImp, roi, Color.yellow) for roi in darkList]
+	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in uvPoreList]
+	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in closedPoresList]
+	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in openPoresList]
+
+	# draw the ROIs on to the image
+	inputImp.getProcessor().setColor(Color.green)
+	IJ.run(inputImp, "Line Width...", "line=3");
+	inputImp.getProcessor().draw(inputRoi)
+	IJ.run(inputImp, "Line Width...", "line=1");
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in porphyrinList]
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.green) for roi in notPorphyrinList]	
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.yellow) for roi in closedPoresList]
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.red) for roi in openPoresList]
 	inputImp.updateAndDraw()
-	#drawAllRoisOnImage(trueColorImp, inputRoi, redList, blueList)
-	
-	# draw overlay
-	# inputImp.setOverlay(overlay1)
-	# inputImp.updateAndDraw()
-	
-	#inputImp.setProperty("pixel_width", "0.5")
-	#inputImp.setProperty("pixel_height", "0.5")
-	#IJ.run(APlus, "Properties...", "channels=1 slices=1 frames=1 unit=inch pixel_width=0.25 pixel_height=0.25 voxel_depth=10");
-	
-	'''calibration=Calibration()
-	calibration.pixelWidth=100.0
-	calibration.pixelHeight=100.0
-	APlus.setCalibration(calibration)'''
 
+	# calculate stats for the UV visible particles
 	detectionParameters.setCalibration(APlus)
+	statsDictUV=CountParticles.calculateParticleStatsUV(APlus, BPlus, redMask, roim.getRoisAsArray())
 	
-	statsdict=CountParticles.calculateParticleStatsUV(APlus, BPlus, redMask, roim.getRoisAsArray())
-	
-	print inputRoiArea
+	totalUVPoreArea=0
+	for area in statsDictUV['Areas']:
+		totalUVPoreArea=totalUVPoreArea+area
+	averageUVPoreArea=totalUVPoreArea/len(statsDictUV['Areas'])
 
-	areas=statsdict['Areas']
-	poreArea=0
-	for area in areas:
-		poreArea=poreArea+area
-	poreArea=poreArea/len(areas)
-
-	diameters=statsdict['Diameters']
 	poreDiameter=0
-	for diameter in diameters:
+	for diameter in statsDictUV['Diameters']:
 		poreDiameter=poreDiameter+diameter
-	poreDiameter=poreDiameter/len(diameters)
+	poreDiameter=poreDiameter/len(statsDictUV['Diameters'])
 
-	ATotal=0
-	ALevels=statsdict['ALevel']
-	for A in ALevels:
-		ATotal=ATotal+A
-
-	AAverage=ATotal/len(ALevels)
-
-	BTotal=0
-	BLevels=statsdict['BLevel']
-	for B in BLevels:
-		BTotal=BTotal+B
-
-	BAverage=BTotal/len(BLevels)
-
-	redTotal=0
-	redPercentages=statsdict['redPercentage']
-	for red in redPercentages:
+	redTotal=0
+	for red in statsDictUV['redPercentage']:
 		redTotal=redTotal+red
+	redAverage=redTotal/len(statsDictUV['redPercentage'])
+	
+	statslist=[len(closedPoresList), len(openPoresList), len(porphyrinList), len(notPorphyrinList), 100*totalUVPoreArea/inputRoiArea, 100*redAverage, averageUVPoreArea, poreDiameter];
+	statsheader=[Messages.ClosedPores, Messages.OpenPores, Messages.Porphyrins, Messages.Sebum, Messages.UVPoresFractionalArea, Messages.PercentageRedPixels, Messages.UVPoresAverageArea, Messages.UVPoresAverageDiameter]
 
-	redAverage=redTotal/len(redPercentages)
-	pixwidth=inputImp.getCalibration().pixelWidth
+	print("Roi Area: "+str(inputRoiArea))
+	print("Total Pore Area: "+str(totalUVPoreArea))
+	print("Average Pore Area: "+str(averageUVPoreArea))
+	
+	print str(len(uvPoreList))+" "+str(len(porphyrinList))+" "+str(len(notPorphyrinList))+" "+str(100*totalUVPoreArea/inputRoiArea)+" "+str(100*redAverage)
 
-	inputRoiArea=inputRoiArea/(pixwidth*pixwidth)
-
-	statslist=[len(allList), len(redList), len(blueList), 100*poreArea/inputRoiArea, 100*redAverage, poreArea, poreDiameter];
-	statsheader=[Messages.TotalDetectedPores, Messages.Porphyrins, Messages.NoPorphyrins, Messages.PoresFractionalArea, Messages.PercentageRedPixels, Messages.AveragePoresArea, Messages.AveragePoresDiameter]
-
-	print str(len(allList))+" "+str(len(redList))+" "+str(len(blueList))+" "+str(100*poreArea/inputRoiArea)+" "+str(100*redAverage)
-
+	print "cp min circularity"+str(detectionParameters.closedPoresMinCircularity)+":"+str(detectionParameters.closedPoresMinSize)
+	
 	# close images that represent intermediate steps
 	APlus.changes=False
 	APlus.close()
@@ -370,8 +324,7 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	BPlus.close()
 	croppedPlus.changes=False
 	croppedPlus.close()
+	thresholdedDark.changes=False
+	thresholdedDark.close()
 
-	return allList, statslist, statsdict, statsheader
-
-
-	
+	return uvPoreList, statslist, statsheader

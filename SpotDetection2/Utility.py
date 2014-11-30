@@ -34,5 +34,23 @@ def getImageListFromDirectory(directory):
             imagelist.append(filename)
     return imagelist
 
+def createImageNames(imp):
+	directory=imp.getOriginalFileInfo().directory
+	name=os.path.splitext(imp.getTitle())[0];
+
+	# name of file to save image with overlay	
+	overlaydir=os.path.join(directory, 'overlay')
+	if not os.path.exists(overlaydir):
+		os.makedirs(overlaydir)
+	overlayname=os.path.join(overlaydir, name+'_overlay.tif')
+	
+	# name of file to save roi 
+	roidir=os.path.join(directory, 'roi')
+	if not os.path.exists(roidir):
+		os.makedirs(roidir)
+	roiname=os.path.join(roidir, name+'.roi')
+
+	return directory, overlayname, roiname
+
 
 		

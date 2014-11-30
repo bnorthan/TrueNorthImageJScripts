@@ -1,9 +1,6 @@
 from ij import IJ
 from ij import Prefs
-from ij import WindowManager
 from ij.gui import Roi
-from ij.gui import GenericDialog
-from ij.gui import NonBlockingGenericDialog
 from ij.process import ImageProcessor
 from ij.plugin.frame import RoiManager;
 from ij.measure import Measurements
@@ -19,7 +16,6 @@ from jarray import array
 import sys
 from net.imglib2.meta import ImgPlus
 from net.imglib2.img.display.imagej import ImageJFunctions
-from net.imglib2.type.numeric.integer import UnsignedByteType
 from java.awt import Color
 from ij.plugin.filter import BackgroundSubtracter
 
@@ -33,7 +29,9 @@ sys.path.append(jythondir)
 
 import SpotDetectionFunction
 reload(SpotDetectionFunction)
-from SpotDetectionFunction import SpotDetectionGray2
+from SpotDetectionFunction import SpotDetectionGray
+from SpotDetectionFunction import SpotDetection2
+from SpotDetectionFunction import SpotDetection3
 
 import CountParticles
 reload(CountParticles)
@@ -43,36 +41,59 @@ import ExportDataFunction
 reload(ExportDataFunction)
 from ExportDataFunction import exportToCsv
 
+import MessageStrings
+reload(MessageStrings)
+from MessageStrings import Messages 
+
+import DetectionParams
+reload(DetectionParams)
+from DetectionParams import DetectionParams
+
 import Utility
 reload(Utility)
-
-class DetectionParameters():
-    def __init__(self, minSize, maxSize, minCircularity, maxCircularity, redPercentage):
-        self.minSize = minSize
-        self.maxSize = maxSize
-        self.minCircularity = minCircularity
-        self.maxCircularity = maxCircularity
-        self.redPercentage = redPercentage
-
+
 def drawRoi(processor, roi, color):
 	processor.setColor(color)
 	processor.draw(roi)
 
-def threshold(imp, lower, upper):
-	duplicate=Duplicator().run(imp)
-	duplicate.getProcessor().resetMinAndMax()
-	IJ.setAutoThreshold(duplicate, "Default dark");
-	IJ.setThreshold(duplicate, lower, upper)
-	IJ.run(duplicate, "Convert to Mask", "");
-	return duplicate
+def runPoreDetection(inputImp, data, ops, display):
+
+	name=inputImp.getTitle()	
+	inputDataset=Utility.getDatasetByName(data, name)
+	
+	detectionParameters=DetectionParams()
+
+	roi=inputImp.getRoi()
+	if (roi is None):
+		message=name+": "+Messages.NoRoi
+		IJ.write(message)
+		return
+
+	roi=inputImp.getRoi().clone();
+
+	header, statslist=poreDetectionTrueColor(inputImp, inputDataset, roi, ops, data, display, detectionParameters)
+
+	directory, overlayname, roiname=Utility.createImageNames(inputImp)
+	statsname=directory+'truecolor_stats.csv'
+	
+	IJ.save(inputImp, overlayname);
+	IJ.saveAs(inputImp, "Selection", roiname);
+
+	header.insert(0,Messages.FileName)
+	statslist.insert(0,name)
+
+	print header
+	print statslist
+
+	ExportDataFunction.exportSummaryStats(statsname, header, statslist)
 
 def poreDetectionTrueColor(inputImp, inputDataset, inputRoi, ops, data, display, detectionParameters):
+	
+	detectionParameters.setCalibration(inputImp);
 	
 	# calculate area of roi 
 	stats=inputImp.getStatistics()
 	inputRoiArea=stats.area
-	
-	print inputRoi
 	
 	# get the bounding box of the active roi
 	inputRec = inputRoi.getBounds()
@@ -93,96 +114,103 @@ def poreDetectionTrueColor(inputImp, inputDataset, inputRoi, ops, data, display,
 	substackMaker=SubstackMaker()
 	# duplicate the roi
 	duplicate=duplicator.run(croppedPlus)
-	
+
+	# separate into RGB and get the blue channel
 	IJ.run(duplicate, "RGB Stack", "")
 	bluePlus=substackMaker.makeSubstack(duplicate, "3-3")
 	blue=ImgPlus(ImageJFunctions.wrapByte(bluePlus))
 	bluePlus.setTitle("Blue")
-	bluePlus.show()
-	imp=IJ.getImage()
-
-	bluePlus=duplicator.run(bluePlus)
-	# threshold the spots from the blue channel
-	#thresholded=SpotDetectionGray2(blue, data, display, ops, True, "percentile", True)
-	#display.createDisplay("thresholded", data.create(thresholded))
-	#impthresholded = ImageJFunctions.wrap(thresholded, "wrapped")
-
-	# if looking for dark spots invert the image
-	imp.getProcessor().invert()
-
-	# subtract background
-	bgs=BackgroundSubtracter()
-	bgs.rollingBallBackground(imp.getProcessor(), 50.0, False, False, True, True, True) 
-
-	# operate on a duplicate
-	imp=duplicator.run(imp)
-
-	# run midGrey autothreshold
-	IJ.run(imp, "Auto Local Threshold", "method=MidGrey radius=15 parameter_1=0 parameter_2=0 white");
-	imp.updateAndDraw()
-	IJ.run(imp, "Convert to Mask", "")
-
-	impthresholded=imp
 	
+	# duplicate and look for bright spots
+	thresholdedLight=SpotDetection2(bluePlus)
+
+	# duplicate and look for dark spots
+	thresholdedDark=SpotDetection3(bluePlus, True)
+
 	# convert to mask
 	Prefs.blackBackground = True
-	IJ.run(imp, "Convert to Mask", "")
-	
+	#IJ.run(thresholdedDark, "Convert to Mask", "")
+
 	# clear the region outside the roi
 	clone=inputRoi.clone()
 	clone.setLocation(0,0)
-	Utility.clearOutsideRoi(imp, clone)
+	Utility.clearOutsideRoi(thresholdedLight, clone)
+	Utility.clearOutsideRoi(thresholdedDark, clone)
+	roimClosedPores = RoiManager(True)
+	detectionParameters.setCalibration(thresholdedDark)
+	countParticles(thresholdedDark, roimClosedPores, detectionParameters.closedPoresMinSize, detectionParameters.closedPoresMaxSize, \
+		detectionParameters.closedPoresMinCircularity, detectionParameters.closedPoresMaxCircularity)
+
+	# count number of open pores
+	roimOpenPores = RoiManager(True)
+	detectionParameters.setCalibration(thresholdedDark)
+	countParticles(thresholdedDark, roimOpenPores, detectionParameters.openPoresMinSize, detectionParameters.openPoresMaxSize, \
+		detectionParameters.openPoresMinCircularity, detectionParameters.openPoresMaxCircularity)
+
+	# count number of sebum
+	roimSebum = RoiManager(True)
+	detectionParameters.setCalibration(thresholdedLight)
+	countParticles(thresholdedLight, roimSebum, detectionParameters.sebumMinSize, detectionParameters.sebumMaxSize, \
+		detectionParameters.sebumMinCircularity, detectionParameters.sebumMaxCircularity)
 	
-	# create a hidden roi manager
-	roim = RoiManager(True)
+	# create lists for open and closed pores
+	closedPoresList=[]
+	for roi in roimClosedPores.getRoisAsArray():
+		closedPoresList.append(roi.clone())
+	openPoresList=[]
+	for roi in roimOpenPores.getRoisAsArray():
+		openPoresList.append(roi.clone())
+
+	# create lists for sebum
+	sebumsList=[]
+	for roi in roimSebum.getRoisAsArray():
+		sebumsList.append(roi.clone())
+
+	# a list of all pores
+	allList=closedPoresList+openPoresList+sebumsList
 	
-	# count the particles
-	countParticles(imp, roim, detectionParameters.minSize, detectionParameters.maxSize, detectionParameters.minCircularity, detectionParameters.maxCircularity)
-	
-	# create a list containing all particles
-	allList=[]
-	for roi in roim.getRoisAsArray():
-		allList.append(roi.clone())
-	
-	# calculate the stats
+	# calculate the stats for all pores
+	detectionParameters.setCalibration(bluePlus)
 	statsDict=CountParticles.calculateParticleStats(bluePlus, allList)
 
-	areas=statsDict['Areas']
-	poreArea=0
-	for area in areas:
-		poreArea=poreArea+area
-
-	poreArea=poreArea/len(areas)
+	poresTotalArea=0
+	for area in statsDict['Areas']:
+		poresTotalArea=poresTotalArea+area
+		print area
+	poresAverageArea=poresTotalArea/len(statsDict['Areas'])
 		
-	intensity=0
-	intensities=statsDict['Intensity']
-	for intens in intensities:
-		intensity=intensity+intens
 
-	intensity=intensity/len(intensities)
-
-	print "Total particles: "+str(len(allList))+ " area: "+str(poreArea)+" intensity: "+str(intensity)
-	
 	# for each roi add the offset such that the roi is positioned in the correct location for the 
 	# original image
 	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in allList]
 	
-	# create an overlay and add the rois
-	overlay1=Overlay()
-		
-	inputRoi.setStrokeColor(Color.green)
-	overlay1.add(inputRoi)
-	[CountParticles.addParticleToOverlay(roi, overlay1, Color.cyan) for roi in allList]
+	# draw the rois on the image
+	inputImp.getProcessor().setColor(Color.green)
+	IJ.run(inputImp, "Line Width...", "line=3");
+	inputImp.getProcessor().draw(inputRoi)
+	IJ.run(inputImp, "Line Width...", "line=1");
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in closedPoresList]
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in openPoresList]
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in sebumsList]
 	
-	def drawAllRoisOnImage(imp, mainRoi, allList):
-		imp.getProcessor().setColor(Color.green)
-		IJ.run(imp, "Line Width...", "line=3");
-		imp.getProcessor().draw(inputRoi)
-		imp.updateAndDraw()
-		IJ.run(imp, "Line Width...", "line=1");
-		[CountParticles.drawParticleOnImage(imp, roi, Color.magenta) for roi in allList]
-		imp.updateAndDraw()
+	inputImp.updateAndDraw()
 	
-	drawAllRoisOnImage(inputImp, inputRoi, allList)
+	# close images that represent intermediate steps
+	croppedPlus.changes=False
+	croppedPlus.close()
+	bluePlus.changes=False
+	bluePlus.close()
+
+	print "Total ROI Area: "+str(inputRoiArea)
+	print "Num closed pores: "+str(len(closedPoresList))
+	print "Num open pores: "+str(len(openPoresList))
+	print "Num sebums: "+str(len(sebumsList))
 	
-	'''
+	print "Total particles: "+str(len(allList))+ " total area: "+str(poresTotalArea)
+	
+	statslist=[inputRoiArea, len(allList), len(closedPoresList), len(openPoresList), len(sebumsList), poresAverageArea, 100*poresTotalArea/inputRoiArea]
+	header=[Messages.TotalAreaMask, Messages.TotalDetectedPores, Messages.ClosedPores, Messages.OpenPores, Messages.Sebum, Messages.PoresAverageArea, Messages.PoresFractionalArea]
+	
+	return header,statslist
+
+	
