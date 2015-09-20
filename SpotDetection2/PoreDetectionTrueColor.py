@@ -189,9 +189,9 @@ def poreDetectionTrueColor(inputImp, inputDataset, inputRoi, ops, data, display,
 	IJ.run(inputImp, "Line Width...", "line=3");
 	inputImp.getProcessor().draw(inputRoi)
 	IJ.run(inputImp, "Line Width...", "line=1");
-	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in closedPoresList]
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.red) for roi in closedPoresList]
 	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in openPoresList]
-	[CountParticles.drawParticleOnImage(inputImp, roi, Color.magenta) for roi in sebumsList]
+	[CountParticles.drawParticleOnImage(inputImp, roi, Color.green) for roi in sebumsList]
 	
 	inputImp.updateAndDraw()
 	

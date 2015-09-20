@@ -17,24 +17,32 @@ from ij.plugin.filter import BackgroundSubtracter
 from fiji.plugin.trackmate.detection import DetectionUtils
 from ij.plugin import Duplicator
 
+def SpotDetectionLog(img, data, ops, thresholdmethod, dimensions2D, factory):
+
+	# create the Laplacian of Gaussian filter
+	kernel = DetectionUtils.createLoGKernel( 3.0, 2, array([1.0, 1.0], 'd' ) )
+
+	# apply the log filter and display the result
+	log=ImgPlus( ops.run("createimg", factory, FloatType(), dimensions2D) )
+	ops.convolve(log, img, kernel)
+	
+	# apply the threshold operation
+	thresholded = ops.run(thresholdmethod, log)
+	
+	return ImgPlus(thresholded)
+
+
 # spot detection routine for gray scale data.  Detects light objects
-def SpotDetectionGray(gray, data, display, ops, invert, thresholdmethod, showSteps=False):
+def SpotDetectionGray(gray, data, display, ops, thresholdmethod, showSteps=False):
 	
 	# get the dimensions
 	dimensions2D=array( [gray.dimension(0), gray.dimension(1)], 'l')
 	factory=gray.getImg().factory()
 
-	# wrap as ImagePlus
-	imp=ImageJFunctions.wrap(gray, "wrapped")
-
-	# create and call background subtractor
-	bgs=BackgroundSubtracter()
-	bgs.rollingBallBackground(imp.getProcessor(), 50.0, False, False, True, True, True) 
-	
 	if (invert==True):
 		imp.getProcessor().invert()
 	
-	imgBgs=ImageJFunctions.wrapByte(imp)
+	imgBgs=gray;#ImageJFunctions.wrapByte(imp)
 
 	if (showSteps): display.createDisplay("back_sub", data.create(ImgPlus(imgBgs))) 
 
@@ -43,22 +51,28 @@ def SpotDetectionGray(gray, data, display, ops, invert, thresholdmethod, showSte
 	imgBgs32=ImgPlus( temp )
 	ops.convert(imgBgs32, imgBgs, ConvertPixCopy() )
 	#display.createDisplay("back_sub 32", data.create(ImgPlus(imgBgs32))) 
+	
+	return SpotDetectionLog(imgBgs32, data, ops, thresholdmethod, dimensions2D, factory)
 
-	# create the Laplacian of Gaussian filter
-	kernel = DetectionUtils.createLoGKernel( 3.0, 2, array([1.0, 1.0], 'd' ) )
-
-	# apply the log filter and display the result
-	log=ImgPlus( ops.run("createimg", factory, FloatType(), dimensions2D) )
-	ops.convolve(log, imgBgs32, kernel)
-	if (showSteps): display.createDisplay("log", data.create(ImgPlus(log)))
+# spot detection routine for gray scale data.  Detects light objects
+def SpotDetectionGray2(gray, data, display, ops, thresholdmethod, showSteps=False):
 	
-	# apply the threshold operation
-	thresholded = ops.run(thresholdmethod, log)
-	
-	return ImgPlus(thresholded)
+	# get the dimensions
+	dimensions2D=array( [gray.dimension(0), gray.dimension(1)], 'l')
+	factory=gray.getImg().factory()
 
+	if (invert==True):
+		imp.getProcessor().invert()
+	
+	imgBgs32=gray;#ImageJFunctions.wrapFloat(imp)
+
+	return SpotDetectionLog(imgBgs32, data, ops, thresholdmethod, dimensions2D, factory)
+
+	
 def SpotDetection2(imp):
+	
 	imp=Duplicator().run(imp)
+	
 	# subtract background
 	bgs=BackgroundSubtracter()
 	bgs.rollingBallBackground(imp.getProcessor(), 50.0, False, False, True, True, True) 

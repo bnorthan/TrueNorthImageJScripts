@@ -19,14 +19,9 @@ def countParticles(imp, roim, minSize, maxSize, minCircularity, maxCircularity):
 	else:
  		print "There was a problem in analyzing", blobs
 
-	#table.show("test")
-
  	areas = table.getColumn(0)
 	intensities = table.getColumn(1)
 	majors=table.getColumn(2)
-
-	#if ( (areas!=None) and (intensities!=None) and (majors!=None) ):
- 	#	for area, intensity, major in zip(areas,intensities, majors): print str(area)+": "+str(intensity)+": "+str(major)
 
 def filterParticles(imp, roiArray, threshold) :
  	newRoiList=[]
@@ -35,7 +30,7 @@ def filterParticles(imp, roiArray, threshold) :
 		stats = imp.getStatistics(Measurements.MEAN)
 		if stats.mean > threshold:
 			newRoiList.append(roi)
-	#	print str(stats.mean)+": "+str(stats.histogram[200])
+
 	return newRoiList
 
 def filterParticlesWithFunction(imp, roiArray, function):
