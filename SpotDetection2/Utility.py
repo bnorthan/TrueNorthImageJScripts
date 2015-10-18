@@ -15,7 +15,12 @@ def printDatasets(data):
 		print dataset.getName()
 
 def getDatasetByName(data, name):
+	print 'here we are'
+	print len(data.getDatasets())
 	for dataset in data.getDatasets():
+		print dataset.getName()
+		print name
+		print '-----'
 		if dataset.getName()==name:
 			return dataset
 	return None

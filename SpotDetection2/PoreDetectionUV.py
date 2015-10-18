@@ -57,9 +57,12 @@ from MessageStrings import Messages
 
 def runPoreDetection(inputImp, data, ops, display):
 
+	
+
 	# in this step get the image in the "imagej2" dataset format
 	# this way we can take advantage of some of the new imagej2 functionality
 	name=inputImp.getTitle()	
+
 	inputDataset=Utility.getDatasetByName(data, name)
 
 	# this structure keeps track of detection parameters
@@ -78,7 +81,7 @@ def runPoreDetection(inputImp, data, ops, display):
 
 	# call the function that processes the UV image
 	roilist, statslist, statsheader=poreDetectionUV(inputImp, inputDataset, roi, ops, data, display, detectionParameters)
-
+	
 	# get the names for the images that will be saved
 	directory, overlayname, roiname=Utility.createImageNames(inputImp)
 	
@@ -132,7 +135,9 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	
 	# crop the roi
 	interval=FinalInterval( array([x1, y1 ,0], 'l'), array([x2, y2, 2], 'l') )
-	cropped=ops.crop(interval, None, inputDataset.getImgPlus() ) 
+	#cropped=ops.image().crop(interval, None, inputDataset.getImgPlus() ) 
+	cropped=ops.image().crop(inputDataset.getImgPlus() , interval) 
+	
 	datacropped=data.create(cropped)
 	display.createDisplay("cropped", datacropped)
 	croppedPlus=IJ.getImage()
@@ -143,7 +148,6 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	
 	# duplicate the roi
 	duplicate=duplicator.run(croppedPlus)
-	
 	
 	# convert duplicate of roi to HSB and get brightness
 	IJ.run(duplicate, "HSB Stack", "");
@@ -230,14 +234,17 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	roiClone=inputRoi.clone()
 	roiClone.setLocation(0,0)
 	Utility.clearOutsideRoi(impthresholded, roiClone)
+
+	impthresholded.show()
 	
 	countParticles(impthresholded, roim, detectionParameters.porphyrinMinSize, detectionParameters.porphyrinMaxSize, \
 		detectionParameters.porphyrinMinCircularity, detectionParameters.porphyrinMaxCircularity)
-
+	
 	uvPoreList=[]
 	for roi in roim.getRoisAsArray():
 		uvPoreList.append(roi.clone())
 
+	
 	#allList=uvPoreList+closedPoresList+openPoresList
 	
 	# count particles that are porphyrins (red)
@@ -245,6 +252,7 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	# count particles that are visible on uv but not porphyrins
 	sebumList=CountParticles.filterParticlesWithFunction(redMask, uvPoreList, notRed)
 
+	
 	# for each roi add the offset such that the roi is positioned in the correct location for the 
 	# original image
 	[roi.setLocation(roi.getXBase()+x1, roi.getYBase()+y1) for roi in uvPoreList]
@@ -286,4 +294,8 @@ def poreDetectionUV(inputImp, inputDataset, inputRoi, ops, data, display, detect
 	print str(len(uvPoreList))+" "+str(len(porphyrinList))+" "+str(len(sebumList))+" "+str(100*totalUVPoreArea/inputRoiArea)+" "+str(100*redAverage)
 	print "cp min circularity"+str(detectionParameters.closedPoresMinCircularity)+":"+str(detectionParameters.closedPoresMinSize)
 
+	# close the thresholded image
+	impthresholded.changes=False
+	impthresholded.close()
+	
 	return uvPoreList, statslist, statsheader

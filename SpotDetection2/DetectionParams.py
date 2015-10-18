@@ -1,3 +1,4 @@
+from ij import IJ
 from ij.measure import Calibration
 
 import os
@@ -39,7 +40,10 @@ class DetectionParams(object):
 		imp.setCalibration(calibration)
 
 	def readCsv(self):
-		settingsdir = os.path.join(os.getcwd(), 'plugins/Evalulab/');
+		#settingsdir = os.path.join(os.getcwd(), 'plugins/Evalulab/');
+		settingsdir = os.path.join(IJ.getDirectory('imagej'), 'plugins/Evalulab/');
+
+		print 'IJm dir:'+IJ.getDirectory('imagej')
 		print settingsdir
 		settingsname=settingsdir+'settings.txt'
 		print settingsname
